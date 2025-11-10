@@ -93,7 +93,9 @@ func GameState(mRequest chan *messageRequest, cPlayers chan *connectionRequest, 
 		select {
 		case mR := <-mRequest:
 			if mR.read {
-				mR.response <- pastMessages[mR.messageID:]
+				mSlice := pastMessages[mR.messageID:]
+				fmt.Println("messages to send: ", len(mSlice))
+				mR.response <- mSlice
 			} else {
 
 				msg := gameMessage{
@@ -300,6 +302,7 @@ func ClientIO(state *stateConnection) {
 				fmt.Println("client missed messages")
 				msgResponse := make(chan []*gameMessage)
 				mID := (int(mT.p[2]) << 8) | int(mT.p[3])
+				fmt.Println("last message", mID)
 				state.mRequest <- &messageRequest{read: false, messageID: int(mID), response: msgResponse}
 				missedMsg := <-msgResponse
 				for mM := range missedMsg {
@@ -307,6 +310,7 @@ func ClientIO(state *stateConnection) {
 					fmt.Println("catch up to client: ", m.messageID, " -> ", m.message)
 					state.player.conn.WriteMessage(websocket.BinaryMessage, m.message)
 				}
+				fmt.Println("all messages sent to client")
 			}
 		case <-errorOut:
 			fmt.Println("client error closed")
