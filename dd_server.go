@@ -189,6 +189,7 @@ func HandleNewConnection(newConn chan *websocket.Conn, cRequest chan *connection
 	}
 }
 func WsRead(read chan wsMsg, ws *websocket.Conn, eOut chan error, readEnd chan bool) {
+	ws.SetPongHandler(func(string) error { return nil })
 	for gameActive {
 		mT, p, err := ws.ReadMessage()
 		select {
@@ -229,7 +230,11 @@ func HostIO(state *stateConnection) {
 				fmt.Println("sent to host: ", gM.message)
 				state.player.conn.WriteMessage(websocket.BinaryMessage, gM.message)
 			} else {
-				state.player.conn.WriteMessage(websocket.PingMessage, nil)
+				err := state.player.conn.WriteMessage(websocket.PingMessage, nil)
+				if err != nil {
+					fmt.Println("bad ping")
+					done <- true
+				}
 			}
 		case mT := <-readIn:
 			if (mT.p[0]>>6)&3 == 1 {
