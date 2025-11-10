@@ -121,7 +121,7 @@ func GameState(mRequest chan *messageRequest, cPlayers chan *connectionRequest, 
 					conn:     cR.message,
 					active:   true,
 					inputs:   make(chan *gameMessage),
-					close:    make(chan bool),
+					close:    make(chan bool, 1),
 				}
 				knownConnections[maxID] = &nC
 				maxID++
@@ -230,7 +230,11 @@ func ClientIO(state *stateConnection) {
 		select {
 		case gM := <-state.player.inputs:
 			fmt.Println("sent to client ", state.player.playerId, ": ", gM.message)
-			state.player.conn.WriteMessage(websocket.BinaryMessage, gM.message)
+			err := state.player.conn.WriteMessage(websocket.BinaryMessage, gM.message)
+			if err != nil {
+				fmt.Println("send error ", err)
+				state.player.close <- true
+			}
 		case mT := <-readIn:
 			switch (mT.p[0] >> 6) & 3 {
 			case 1:
@@ -246,16 +250,20 @@ func ClientIO(state *stateConnection) {
 				for mM := range missedMsg {
 					m := missedMsg[mM]
 					fmt.Println("catch up to client: ", m.messageID, " -> ", m.message)
-					state.player.conn.WriteMessage(websocket.BinaryMessage, m.message)
+					err := state.player.conn.WriteMessage(websocket.BinaryMessage, m.message)
+					if err != nil {
+						fmt.Println("send error ", err)
+						state.player.close <- true
+					}
 				}
 				fmt.Println("all messages sent to client")
 			}
 		case <-errorOut:
-			fmt.Println("client error closed")
+			fmt.Println("client error closed ", state.player.playerId)
 			pR := playerRequest{disconnect: true, playerID: state.player.playerId}
 			state.pRequest <- &pR
 		case <-state.player.close:
-			fmt.Println("client closed")
+			fmt.Println("client closed ", state.player.playerId)
 			state.player.conn.WriteMessage(websocket.CloseMessage, []byte{})
 			state.player.conn.Close()
 			readEnd <- true
