@@ -230,7 +230,7 @@ func HostIO(state *stateConnection) {
 				fmt.Println("sent to host: ", gM.message)
 				state.player.conn.WriteMessage(websocket.BinaryMessage, gM.message)
 			} else {
-				err := state.player.conn.WriteMessage(websocket.PingMessage, nil)
+				err := state.player.conn.WriteMessage(websocket.BinaryMessage, []byte{0})
 				if err != nil {
 					fmt.Println("bad ping")
 					done <- true
@@ -261,7 +261,10 @@ func HostIO(state *stateConnection) {
 			if state.player.inputs != nil {
 				close(state.player.inputs)
 			}
-			readEnd <- true
+			select {
+			case readEnd <- true:
+			default:
+			}
 			done <- true
 			return
 		}
