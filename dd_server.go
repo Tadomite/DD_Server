@@ -297,14 +297,15 @@ func ClientIO(state *stateConnection) {
 				pR := playerRequest{hostMsg: true, message: mT.p}
 				state.pRequest <- &pR
 			case 2:
+				fmt.Println("client missed messages")
 				msgResponse := make(chan []*gameMessage)
-				defer close(msgResponse)
 				mID := (int(mT.p[2]) << 8) | int(mT.p[3])
 				state.mRequest <- &messageRequest{read: false, messageID: int(mID), response: msgResponse}
 				missedMsg := <-msgResponse
 				for mM := range missedMsg {
 					m := missedMsg[mM]
-					state.player.conn.WriteMessage(websocket.TextMessage, m.message)
+					fmt.Println("catch up to client: ", m.messageID, " -> ", m.message)
+					state.player.conn.WriteMessage(websocket.BinaryMessage, m.message)
 				}
 			}
 		case <-errorOut:
