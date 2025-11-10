@@ -108,6 +108,9 @@ func GameState(mRequest chan *messageRequest, cPlayers chan *connectionRequest, 
 				/*if knownConnections[cR.playerId].active {
 				}*/
 			} else {
+				if knownConnections[0] != nil {
+					knownConnections[0].inputs <- &gameMessage{messageID: -1}
+				}
 				nC := playerConnection{
 					playerId: maxID,
 					conn:     cR.message,
@@ -218,8 +221,12 @@ func HostIO(state *stateConnection) {
 	for gameActive {
 		select {
 		case gM := <-state.player.inputs:
-			fmt.Println("sent to host: ", gM.message)
-			state.player.conn.WriteMessage(websocket.BinaryMessage, gM.message)
+			if gM.messageID >= 0 {
+				fmt.Println("sent to host: ", gM.message)
+				state.player.conn.WriteMessage(websocket.BinaryMessage, gM.message)
+			} else {
+				state.player.conn.WriteMessage(websocket.PingMessage, nil)
+			}
 		case mT := <-readIn:
 			if (mT.p[0]>>6)&3 == 1 {
 				mR := messageRequest{read: false, message: mT.p, senderID: 0}
