@@ -201,12 +201,16 @@ func WsRead(read chan wsMsg, ws *websocket.Conn, eOut chan error, readEnd chan b
 			eOut <- err
 			return
 		}
+		if mT != websocket.PongMessage {
+			return
+		}
 		fmt.Println("message ", p)
 		wsM := wsMsg{
 			mT:  mT,
 			p:   p,
 			err: err,
 		}
+
 		read <- wsM
 	}
 }
@@ -243,12 +247,17 @@ func HostIO(state *stateConnection) {
 			return
 		case <-state.player.close:
 			fmt.Println("host closed")
-			state.player.conn.WriteMessage(websocket.CloseMessage, []byte{})
-			state.player.conn.Close()
+			e1 := state.player.conn.WriteMessage(websocket.CloseMessage, []byte{})
+			e2 := state.player.conn.Close()
+			if e1 != nil && e2 != nil {
+				fmt.Println(e1)
+				fmt.Println(e2)
+			}
 			if state.player.inputs != nil {
 				close(state.player.inputs)
 			}
 			readEnd <- true
+			done <- true
 			return
 		}
 	}
