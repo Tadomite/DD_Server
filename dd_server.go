@@ -301,7 +301,7 @@ func GameMain() {
 		handler(newConnection, w, r)
 	})
 	go HandleNewConnection(newConnection, cRequest)
-	go http.ListenAndServe(":8080", nil)
+	go http.ListenAndServe(":10000", nil)
 	for {
 		fmt.Println("Game Start")
 		gameActive = true
