@@ -185,7 +185,7 @@ func HandleNewConnection(newConn chan *websocket.Conn, cRequest chan *connection
 				go ClientIO(pC)
 			}
 			rBytes := []byte{(3 << 4) | byte(pC.player.playerId>>8), byte(pC.player.playerId)}
-			fmt.Println("sent: ", rBytes)
+			//fmt.Println("sent: ", rBytes)
 			//nC.WriteMessage(websocket.BinaryMessage, rBytes)
 			pC.player.inputs <- &gameMessage{message: rBytes}
 		} else {
@@ -208,10 +208,10 @@ func WsRead(read chan wsMsg, ws *websocket.Conn, eOut chan error, readEnd chan b
 			eOut <- err
 			return
 		}
-		if mT != websocket.PongMessage {
+		fmt.Println("message ", p)
+		if mT == websocket.PingMessage || mT == websocket.PongMessage {
 			return
 		}
-		fmt.Println("message ", p)
 		wsM := wsMsg{
 			mT:  mT,
 			p:   p,
