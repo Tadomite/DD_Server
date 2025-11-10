@@ -58,6 +58,7 @@ type stateConnection struct {
 type gameMessage struct {
 	messageID int
 	message   []byte
+	success   chan bool
 }
 type wsMsg struct {
 	mT  int
@@ -109,7 +110,11 @@ func GameState(mRequest chan *messageRequest, cPlayers chan *connectionRequest, 
 				}*/
 			} else {
 				if knownConnections[0] != nil {
-					knownConnections[0].inputs <- &gameMessage{messageID: -1}
+					succ := make(chan bool)
+					knownConnections[0].inputs <- &gameMessage{messageID: -1, success: succ}
+					if !<-succ {
+						break
+					}
 				}
 				nC := playerConnection{
 					playerId: maxID,
@@ -140,6 +145,7 @@ func GameState(mRequest chan *messageRequest, cPlayers chan *connectionRequest, 
 				pR.response <- knownConnections[pR.playerID]
 			}
 		case <-done:
+			fmt.Println("game done")
 			for _, kC := range knownConnections {
 				select {
 				case kC.close <- true:
@@ -232,8 +238,10 @@ func HostIO(state *stateConnection) {
 			} else {
 				err := state.player.conn.WriteMessage(websocket.BinaryMessage, []byte{0})
 				if err != nil {
-					fmt.Println("bad ping")
+					fmt.Println("bad ping ", err)
 					done <- true
+				} else {
+					gM.success <- true
 				}
 			}
 		case mT := <-readIn:
