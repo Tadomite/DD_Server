@@ -32,8 +32,6 @@ type messageRequest struct {
 }
 type playerRequest struct {
 	disconnect bool
-	hostMsg    bool
-	message    []byte
 	playerID   int
 	response   chan *playerConnection
 }
@@ -137,12 +135,13 @@ func GameState(mRequest chan *messageRequest, cPlayers chan *connectionRequest, 
 				broadcastMessage(&messageRequest{read: false, message: []byte{160 | byte(len(knownConnections)>>8), byte(len(knownConnections) & 255)}, senderID: maxID - 1})
 			}
 		case pR := <-pRequest:
-			if pR.hostMsg {
-				knownConnections[0].inputs <- &gameMessage{message: pR.message}
-			} else if pR.disconnect {
+			if pR.disconnect {
 				pC := knownConnections[pR.playerID]
 				delete(knownConnections, pC.playerId)
 				pC.close <- true
+				if len(knownConnections) <= 0 {
+					done <- true
+				}
 			} else {
 				pR.response <- knownConnections[pR.playerID]
 			}
@@ -181,11 +180,7 @@ func HandleNewConnection(newConn chan *websocket.Conn, cRequest chan *connection
 			cRequest <- &nR
 			pC := <-connectResponse
 			close(connectResponse)
-			if pC.player.playerId == 0 {
-				go HostIO(pC)
-			} else {
-				go ClientIO(pC)
-			}
+			go ClientIO(pC)
 			rBytes := []byte{(3 << 4) | byte(pC.player.playerId>>8), byte(pC.player.playerId)}
 			//fmt.Println("sent: ", rBytes)
 			//nC.WriteMessage(websocket.BinaryMessage, rBytes)
@@ -223,63 +218,6 @@ func WsRead(read chan wsMsg, ws *websocket.Conn, eOut chan error, readEnd chan b
 		read <- wsM
 	}
 }
-func HostIO(state *stateConnection) {
-	fmt.Println("host started")
-	readIn := make(chan wsMsg)
-	errorOut := make(chan error)
-	readEnd := make(chan bool)
-	defer close(readIn)
-	defer close(errorOut)
-	go WsRead(readIn, state.player.conn, errorOut, readEnd)
-	for gameActive {
-		select {
-		case gM := <-state.player.inputs:
-			if gM.messageID >= 0 {
-				fmt.Println("sent to host: ", gM.message)
-				state.player.conn.WriteMessage(websocket.BinaryMessage, gM.message)
-			} else {
-				err := state.player.conn.WriteMessage(websocket.BinaryMessage, []byte{0})
-				if err != nil {
-					fmt.Println("bad ping ", err)
-					done <- true
-				} else {
-					gM.success <- true
-				}
-			}
-		case mT := <-readIn:
-			if (mT.p[0]>>6)&3 == 1 {
-				mR := messageRequest{read: false, message: mT.p, senderID: 0}
-				state.mRequest <- &mR
-			}
-		case <-errorOut:
-			fmt.Println("host error closed")
-			state.player.conn.WriteMessage(websocket.CloseMessage, []byte{})
-			state.player.conn.Close()
-			done <- true
-			if state.player.inputs != nil {
-				close(state.player.inputs)
-			}
-			return
-		case <-state.player.close:
-			fmt.Println("host closed")
-			e1 := state.player.conn.WriteMessage(websocket.CloseMessage, []byte{})
-			e2 := state.player.conn.Close()
-			if e1 != nil && e2 != nil {
-				fmt.Println(e1)
-				fmt.Println(e2)
-			}
-			if state.player.inputs != nil {
-				close(state.player.inputs)
-			}
-			select {
-			case readEnd <- true:
-			default:
-			}
-			done <- true
-			return
-		}
-	}
-}
 func ClientIO(state *stateConnection) {
 	fmt.Println("client started")
 	errorOut := make(chan error)
@@ -291,13 +229,13 @@ func ClientIO(state *stateConnection) {
 	for gameActive {
 		select {
 		case gM := <-state.player.inputs:
-			fmt.Println("sent to client: ", gM.message)
+			fmt.Println("sent to client ", state.player.playerId, ": ", gM.message)
 			state.player.conn.WriteMessage(websocket.BinaryMessage, gM.message)
 		case mT := <-readIn:
 			switch (mT.p[0] >> 6) & 3 {
 			case 1:
-				pR := playerRequest{hostMsg: true, message: mT.p}
-				state.pRequest <- &pR
+				pR := messageRequest{message: mT.p, senderID: state.player.playerId}
+				state.mRequest <- &pR
 			case 2:
 				fmt.Println("client missed messages")
 				msgResponse := make(chan []*gameMessage)
@@ -348,7 +286,7 @@ func GameMain() {
 	}
 }
 
-var done = make(chan bool)
+var done = make(chan bool, 1)
 
 func main() {
 	GameMain()
