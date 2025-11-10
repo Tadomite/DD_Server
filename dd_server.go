@@ -198,6 +198,7 @@ func WsRead(read chan wsMsg, ws *websocket.Conn, eOut chan error, readEnd chan b
 			eOut <- err
 			return
 		}
+		fmt.Println("message ", p)
 		wsM := wsMsg{
 			mT:  mT,
 			p:   p,
