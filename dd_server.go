@@ -186,7 +186,7 @@ func HandleNewConnection(newConn chan *websocket.Conn, cRequest chan *connection
 	}
 }
 func WsRead(read chan wsMsg, ws *websocket.Conn, eOut chan error, readEnd chan bool) {
-	ws.SetPongHandler(func(string) error { return nil })
+	ws.SetPongHandler(func(string) error { ws.SetReadDeadline(time.Now().Add(10 * time.Second)); return nil })
 	for gameActive {
 		mT, p, err := ws.ReadMessage()
 		select {
@@ -214,6 +214,7 @@ func WsRead(read chan wsMsg, ws *websocket.Conn, eOut chan error, readEnd chan b
 }
 func ClientIO(state *stateConnection) {
 	fmt.Println("client started")
+	ticker := time.NewTicker(10 * time.Second)
 	errorOut := make(chan error)
 	readIn := make(chan wsMsg)
 	readEnd := make(chan bool)
@@ -253,6 +254,12 @@ func ClientIO(state *stateConnection) {
 					}
 				}
 				fmt.Println("all messages sent to client")
+			}
+		case <-ticker.C:
+			state.player.conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
+			if err := state.player.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+				fmt.Println("ping send error ", err)
+				state.player.close <- true
 			}
 		case <-errorOut:
 			fmt.Println("client error closed ", state.player.playerId)
