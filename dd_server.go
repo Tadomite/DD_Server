@@ -50,9 +50,10 @@ type playerConnection struct {
 	close    chan bool
 }
 type stateConnection struct {
-	player   playerConnection
-	pRequest chan *playerRequest
-	mRequest chan *messageRequest
+	player      playerConnection
+	pRequest    chan *playerRequest
+	mRequest    chan *messageRequest
+	gameStarted bool
 }
 type gameMessage struct {
 	messageID int
@@ -126,9 +127,13 @@ func GameState(mRequest chan *messageRequest, cPlayers chan *connectionRequest, 
 				maxID++
 				fmt.Println(len(knownConnections), " ", maxID)
 				sC := stateConnection{
-					player:   nC,
-					pRequest: pRequest,
-					mRequest: mRequest,
+					player:      nC,
+					pRequest:    pRequest,
+					mRequest:    mRequest,
+					gameStarted: false,
+				}
+				if len(pastMessages) > 0 {
+					sC.gameStarted = true
 				}
 				cR.response <- &sC
 				broadcastMessage(&messageRequest{read: false, message: []byte{160 | byte(len(knownConnections)>>8), byte(len(knownConnections) & 255)}, senderID: maxID - 1})
@@ -181,7 +186,11 @@ func HandleNewConnection(newConn chan *websocket.Conn, cRequest chan *connection
 			pC := <-connectResponse
 			close(connectResponse)
 			go ClientIO(pC)
-			rBytes := []byte{(3 << 4) | byte(pC.player.playerId>>8), byte(pC.player.playerId)}
+			startedByte := 0
+			if pC.gameStarted {
+				startedByte = 255
+			}
+			rBytes := []byte{(3 << 4) | byte(pC.player.playerId>>8), byte(pC.player.playerId), byte(startedByte)}
 			//fmt.Println("sent: ", rBytes)
 			//nC.WriteMessage(websocket.BinaryMessage, rBytes)
 			pC.player.inputs <- &gameMessage{message: rBytes}
