@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"runtime"
+	"time"
 
 	"github.com/gorilla/websocket"
 )
@@ -131,7 +132,9 @@ func GameState(mRequest chan *messageRequest, cPlayers chan *connectionRequest, 
 			if pR.disconnect {
 				pC := knownConnections[pR.playerID]
 				delete(knownConnections, pC.playerId)
+				broadcastMessage(&messageRequest{read: false, message: []byte{160 | byte(len(knownConnections)>>8), byte(len(knownConnections) & 255)}, senderID: pC.playerId})
 				pC.close <- true
+				fmt.Println("clients still connected ", len((knownConnections)))
 				if len(knownConnections) <= 0 {
 					done <- true
 				}
@@ -156,7 +159,6 @@ func HandleNewConnection(newConn chan *websocket.Conn, cRequest chan *connection
 		_, p, err := nC.ReadMessage()
 		if err != nil {
 			fmt.Println("error ", err)
-			nC.WriteMessage(websocket.CloseMessage, []byte{})
 			nC.Close()
 			continue
 		}
@@ -179,7 +181,6 @@ func HandleNewConnection(newConn chan *websocket.Conn, cRequest chan *connection
 			//nC.WriteMessage(websocket.BinaryMessage, rBytes)
 			pC.player.inputs <- &gameMessage{message: rBytes}
 		} else {
-			nC.WriteMessage(websocket.CloseMessage, []byte{})
 			nC.Close()
 		}
 	}
@@ -223,6 +224,7 @@ func ClientIO(state *stateConnection) {
 		select {
 		case gM := <-state.player.inputs:
 			fmt.Println("sent to client ", state.player.playerId, ": ", gM.message)
+			state.player.conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
 			err := state.player.conn.WriteMessage(websocket.BinaryMessage, gM.message)
 			if err != nil {
 				fmt.Println("send error ", err)
@@ -243,6 +245,7 @@ func ClientIO(state *stateConnection) {
 				for mM := range missedMsg {
 					m := missedMsg[mM]
 					fmt.Println("catch up to client: ", m.messageID, " -> ", m.message)
+					state.player.conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
 					err := state.player.conn.WriteMessage(websocket.BinaryMessage, m.message)
 					if err != nil {
 						fmt.Println("send error ", err)
@@ -257,7 +260,6 @@ func ClientIO(state *stateConnection) {
 			state.pRequest <- &pR
 		case <-state.player.close:
 			fmt.Println("client closed ", state.player.playerId)
-			state.player.conn.WriteMessage(websocket.CloseMessage, []byte{})
 			state.player.conn.Close()
 			readEnd <- true
 			return
