@@ -188,7 +188,7 @@ func HandleNewConnection(newConn chan *websocket.Conn, cRequest chan *connection
 func WsRead(read chan wsMsg, ws *websocket.Conn, eOut chan error, readEnd chan bool) {
 	ws.SetPongHandler(func(string) error {
 		fmt.Println("pong")
-		ws.SetReadDeadline(time.Now().Add(10 * time.Second))
+		ws.SetReadDeadline(time.Now().Add(15 * time.Second))
 		return nil
 	})
 	for gameActive {
@@ -205,7 +205,7 @@ func WsRead(read chan wsMsg, ws *websocket.Conn, eOut chan error, readEnd chan b
 		}
 		fmt.Println("message ", p)
 		if mT == websocket.PingMessage || mT == websocket.PongMessage {
-			return
+			continue
 		}
 		wsM := wsMsg{
 			mT:  mT,
@@ -250,7 +250,7 @@ func ClientIO(state *stateConnection) {
 				for mM := range missedMsg {
 					m := missedMsg[mM]
 					fmt.Println("catch up to client: ", m.messageID, " -> ", m.message)
-					state.player.conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
+					state.player.conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
 					err := state.player.conn.WriteMessage(websocket.BinaryMessage, m.message)
 					if err != nil {
 						fmt.Println("send error ", err)
@@ -261,7 +261,7 @@ func ClientIO(state *stateConnection) {
 			}
 		case <-ticker.C:
 			fmt.Println("ping ", state.player.playerId)
-			state.player.conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
+			state.player.conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
 			if err := state.player.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
 				fmt.Println("ping send error ", err)
 				state.player.close <- true
