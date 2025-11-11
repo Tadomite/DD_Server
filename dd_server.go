@@ -237,7 +237,7 @@ func ClientIO(state *stateConnection) {
 				msgResponse := make(chan []*gameMessage)
 				mID := (int(mT.p[2]) << 8) | int(mT.p[3])
 				fmt.Println("last message", mID)
-				state.mRequest <- &messageRequest{read: false, messageID: int(mID), response: msgResponse}
+				state.mRequest <- &messageRequest{read: true, messageID: int(mID), response: msgResponse}
 				missedMsg := <-msgResponse
 				for mM := range missedMsg {
 					m := missedMsg[mM]
