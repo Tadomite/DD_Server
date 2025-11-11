@@ -67,6 +67,10 @@ type wsMsg struct {
 var gameActive bool = false
 
 func GameState(mRequest chan *messageRequest, cPlayers chan *connectionRequest, pRequest chan *playerRequest) {
+	fmt.Println("client started")
+	defer func() {
+		fmt.Println("game state closed")
+	}()
 	knownConnections := make(map[int]*playerConnection)
 	var maxID int = 0
 	var pastMessages []*gameMessage
@@ -75,15 +79,16 @@ func GameState(mRequest chan *messageRequest, cPlayers chan *connectionRequest, 
 		for kC := range knownConnections {
 			pC := knownConnections[kC]
 			if pC.playerId != mR.senderID && pC.active {
-				go func() {
+				select {
+				case pC.inputs <- &gameMessage{message: mR.message}:
+				default:
+					pC.active = false
 					select {
-					case pC.inputs <- &gameMessage{message: mR.message}:
+					case pC.close <- true:
 					default:
-						pC.active = false
-						pC.close <- true
-						delete(knownConnections, pC.playerId)
 					}
-				}()
+					delete(knownConnections, pC.playerId)
+				}
 			}
 		}
 	}
@@ -186,6 +191,9 @@ func HandleNewConnection(newConn chan *websocket.Conn, cRequest chan *connection
 	}
 }
 func WsRead(read chan wsMsg, ws *websocket.Conn, eOut chan error, readEnd chan bool) {
+	defer func() {
+		fmt.Println("WsRead closed")
+	}()
 	ws.SetPongHandler(func(string) error {
 		fmt.Println("pong")
 		ws.SetReadDeadline(time.Now().Add(15 * time.Second))
@@ -218,6 +226,9 @@ func WsRead(read chan wsMsg, ws *websocket.Conn, eOut chan error, readEnd chan b
 }
 func ClientIO(state *stateConnection) {
 	fmt.Println("client started")
+	defer func() {
+		fmt.Println("client closed ", state.player.playerId)
+	}()
 	ticker := time.NewTicker(10 * time.Second)
 	errorOut := make(chan error)
 	readIn := make(chan wsMsg)
@@ -270,8 +281,8 @@ func ClientIO(state *stateConnection) {
 			fmt.Println("client error closed ", state.player.playerId)
 			pR := playerRequest{disconnect: true, playerID: state.player.playerId}
 			state.pRequest <- &pR
+			return
 		case <-state.player.close:
-			fmt.Println("client closed ", state.player.playerId)
 			state.player.conn.Close()
 			readEnd <- true
 			return
