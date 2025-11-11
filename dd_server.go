@@ -56,7 +56,6 @@ type stateConnection struct {
 type gameMessage struct {
 	messageID int
 	message   []byte
-	success   chan bool
 }
 type wsMsg struct {
 	mT  int
@@ -109,13 +108,6 @@ func GameState(mRequest chan *messageRequest, cPlayers chan *connectionRequest, 
 				/*if knownConnections[cR.playerId].active {
 				}*/
 			} else {
-				if knownConnections[0] != nil {
-					succ := make(chan bool)
-					knownConnections[0].inputs <- &gameMessage{messageID: -1, success: succ}
-					if !<-succ {
-						break
-					}
-				}
 				nC := playerConnection{
 					playerId: maxID,
 					conn:     cR.message,
