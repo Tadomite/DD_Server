@@ -94,11 +94,12 @@ func GameState(mRequest chan *messageRequest, cPlayers chan *connectionRequest, 
 				fmt.Println("messages to send: ", len(mSlice))
 				mR.response <- mSlice
 			} else {
-
 				msg := gameMessage{
 					messageID: len(pastMessages),
 					message:   mR.message,
 				}
+				msg.message[2] = byte(msg.messageID >> 8)
+				msg.message[3] = byte(msg.messageID & 255)
 				fmt.Println(len(pastMessages))
 				pastMessages = append(pastMessages, &msg)
 				broadcastMessage(mR)
