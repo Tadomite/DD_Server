@@ -68,7 +68,7 @@ type wsMsg struct {
 var gameActive bool = false
 
 func GameState(mRequest chan *messageRequest, cPlayers chan *connectionRequest, pRequest chan *playerRequest) {
-	fmt.Println("client started")
+	fmt.Println("game state started")
 	defer func() {
 		fmt.Println("game state closed")
 	}()
@@ -88,6 +88,8 @@ func GameState(mRequest chan *messageRequest, cPlayers chan *connectionRequest, 
 					case pC.close <- true:
 					default:
 					}
+					close(pC.inputs)
+					close(pC.close)
 					delete(knownConnections, pC.playerId)
 				}
 			}
@@ -124,8 +126,8 @@ func GameState(mRequest chan *messageRequest, cPlayers chan *connectionRequest, 
 					close:    make(chan bool, 1),
 				}
 				kCID := maxID
-				_, noZero := knownConnections[0]
-				if !noZero && maxID != 0 {
+				zeroConn, noZero := knownConnections[0]
+				if !noZero && maxID != 0 || (noZero && !zeroConn.active) {
 					nC.playerId = 0
 					kCID = 0
 					fmt.Println("Replacing Player Zero")
@@ -220,6 +222,7 @@ func WsRead(read chan wsMsg, ws *websocket.Conn, eOut chan error, readEnd chan b
 		mT, p, err := ws.ReadMessage()
 		select {
 		case <-readEnd:
+			fmt.Println("read ended")
 			return
 		default:
 		}
@@ -252,6 +255,7 @@ func ClientIO(state *stateConnection) {
 	readEnd := make(chan bool)
 	defer close(readIn)
 	defer close(errorOut)
+	defer close(readEnd)
 	go WsRead(readIn, state.player.conn, errorOut, readEnd)
 	for gameActive {
 		select {
@@ -301,6 +305,7 @@ func ClientIO(state *stateConnection) {
 			return
 		case <-state.player.close:
 			state.player.conn.Close()
+			state.player.active = false
 			readEnd <- true
 			return
 		}
