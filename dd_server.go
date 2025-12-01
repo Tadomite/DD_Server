@@ -123,7 +123,13 @@ func GameState(mRequest chan *messageRequest, cPlayers chan *connectionRequest, 
 					inputs:   make(chan *gameMessage),
 					close:    make(chan bool, 1),
 				}
-				knownConnections[maxID] = &nC
+				kCID := maxID
+				_, noZero := knownConnections[0]
+				if noZero {
+					nC.playerId = 0
+					kCID = 0
+				}
+				knownConnections[kCID] = &nC
 				maxID++
 				fmt.Println(len(knownConnections), " ", maxID)
 				sC := stateConnection{
