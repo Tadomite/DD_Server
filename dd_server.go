@@ -146,7 +146,7 @@ func GameState(mRequest chan *messageRequest, cPlayers chan *connectionRequest, 
 					sC.gameStarted = true
 				}
 				cR.response <- &sC
-				broadcastMessage(&messageRequest{read: false, message: []byte{160 | byte(len(knownConnections)>>8), byte(len(knownConnections) & 255)}, senderID: maxID - 1})
+				broadcastMessage(&messageRequest{read: false, message: []byte{160 | byte(len(knownConnections)>>8), byte(len(knownConnections) & 255)}, senderID: kCID})
 			}
 		case pR := <-pRequest:
 			if pR.disconnect {
@@ -201,7 +201,7 @@ func HandleNewConnection(newConn chan *websocket.Conn, cRequest chan *connection
 				startedByte = 255
 			}
 			rBytes := []byte{(3 << 4) | byte(pC.player.playerId>>8), byte(pC.player.playerId), byte(startedByte)}
-			//fmt.Println("sent: ", rBytes)
+			fmt.Println("sent: ", pC.player.playerId, " ", rBytes)
 			//nC.WriteMessage(websocket.BinaryMessage, rBytes)
 			pC.player.inputs <- &gameMessage{message: rBytes}
 		} else {
