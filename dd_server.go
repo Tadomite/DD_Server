@@ -124,8 +124,8 @@ func GameState(mRequest chan *messageRequest, cPlayers chan *connectionRequest, 
 					close:    make(chan bool, 1),
 				}
 				kCID := maxID
-				zeroConn, noZero := knownConnections[0]
-				if !noZero || !zeroConn.active {
+				_, noZero := knownConnections[0]
+				if !noZero {
 					nC.playerId = 0
 					kCID = 0
 				}
