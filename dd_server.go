@@ -128,9 +128,11 @@ func GameState(mRequest chan *messageRequest, cPlayers chan *connectionRequest, 
 				if !noZero {
 					nC.playerId = 0
 					kCID = 0
+					fmt.Println("Replacing Player Zero")
+				} else {
+					maxID++
 				}
 				knownConnections[kCID] = &nC
-				maxID++
 				fmt.Println(len(knownConnections), " ", maxID)
 				sC := stateConnection{
 					player:      nC,
